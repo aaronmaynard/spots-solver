@@ -9,9 +9,10 @@ function SpotsSolver() {
   const [yellowInput, setYellowInput] = useState(""); // Yellow dots input
   const [eliminatedColors, setEliminatedColors] = useState([]); // Colors known to be absent
   const [colorPositions, setColorPositions] = useState({}); // Track where each color has been tried
+  const [positionExclusions, setPositionExclusions] = useState({}); // Track colors excluded from positions
 
-  // Generate a new guess based on feedback, eliminated colors, and color positions
-  const generateNextGuess = (currentGuess, latestFeedback, currentEliminated, currentPositions) => {
+  // Generate a new guess based on feedback, eliminated colors, color positions, and position exclusions
+  const generateNextGuess = (currentGuess, latestFeedback, currentEliminated, currentPositions, currentExclusions) => {
     if (!latestFeedback) return [...currentGuess]; // First guess, return a new array
 
     const { green, yellow } = latestFeedback;
@@ -23,36 +24,56 @@ function SpotsSolver() {
     console.log("Feedback:", { green, yellow });
     console.log("Eliminated Colors:", currentEliminated);
     console.log("Color Positions:", currentPositions);
+    console.log("Position Exclusions:", currentExclusions);
     console.log("Available Colors:", availableColors);
 
-    // Step 1: Lock in green positions (correct color, correct position)
+    // Step 1: Lock in green positions (correct color, correct position) only if confirmed (e.g., 3+ green)
     for (let i = 0; i < green; i++) {
-      newGuess[i] = currentGuess[i];
-      availableColors = availableColors.filter(c => c !== currentGuess[i]); // Filter instead of splice
-      // Update color positions for correct placements
-      setColorPositions(prev => ({
-        ...prev,
-        [currentGuess[i]]: [...(prev[currentGuess[i]] || []), i]
-      }));
+      if (green >= 3) { // Only lock if strong evidence (3 or 4 green)
+        newGuess[i] = currentGuess[i];
+        availableColors = availableColors.filter(c => c !== currentGuess[i]); // Filter instead of splice
+        // Update color positions for correct placements
+        setColorPositions(prev => ({
+          ...prev,
+          [currentGuess[i]]: [...(prev[currentGuess[i]] || []), i]
+        }));
+        // Clear any exclusions for this color in this position
+        setPositionExclusions(prev => {
+          const updated = { ...prev };
+          if (updated[currentGuess[i]]) {
+            updated[currentGuess[i]] = updated[currentGuess[i]].filter(pos => pos !== i);
+            if (updated[currentGuess[i]].length === 0) delete updated[currentGuess[i]];
+          }
+          return updated;
+        });
+      }
     }
 
-    // Step 2: Handle yellow (correct color, wrong position) and update color positions
+    // Step 2: Handle yellow (correct color, wrong position) and update color positions/exclusions
     if (yellow > 0) {
-      let yellowColors = [...currentGuess.filter(c => availableColors.includes(c))]; // Use let and spread for mutation
-
-      console.log("Yellow Colors before handling:", yellowColors);
+      let yellowColors = [...currentGuess.filter(c => availableColors.includes(c))]; // Use let and spread
 
       if (yellow === 4) {
-        // Special case: 4 yellow means all colors are correct but misplaced
-        newGuess = [
-          currentGuess[2], // Third to first
-          currentGuess[3], // Fourth to second
-          currentGuess[0], // First to third
-          currentGuess[1]  // Second to fourth
-        ];
-        console.log("4 Yellow detected, swapping positions:", newGuess);
+        // Special case: 4 yellow means all colors in the guess are in the solution but misplaced
+        const validColors = ["🟣", "⚪"]; // After eliminating red, blue, green, yellow, only white and purple remain
+        const permutations = generatePermutations(validColors, 4);
+        for (const perm of permutations) {
+          if (!arrayEquals(perm, currentGuess) && !history.some(entry => arrayEquals(entry.guess, perm))) {
+            let tempGreen = 0, tempYellow = 0;
+            for (let i = 0; i < 4; i++) {
+              if (perm[i] === currentGuess[i]) tempGreen++;
+              if (currentGuess.includes(perm[i])) tempYellow++;
+            }
+            tempYellow -= tempGreen; // Adjust for overlaps
+            if (tempGreen === 0 && tempYellow === 4) {
+              newGuess = [...perm]; // Use spread for a new array
+              break;
+            }
+          }
+        }
+        console.log("4 Yellow detected, permuting positions:", newGuess);
       } else {
-        // General case for yellow: move colors to new positions
+        // General case for yellow: move colors to new positions, update exclusions
         let placedYellows = 0;
         for (let i = 0; i < 4 && placedYellows < yellow; i++) {
           if (!newGuess[i] && yellowColors.length > 0) {
@@ -68,24 +89,34 @@ function SpotsSolver() {
                 ...prev,
                 [candidateColor]: [...(prev[candidateColor] || []), i]
               }));
+              // Update position exclusions for colors not in correct positions
+              setPositionExclusions(prev => {
+                const updated = { ...prev };
+                currentGuess.forEach((color, pos) => {
+                  if (color !== candidateColor && availableColors.includes(color) && pos !== originalPos) {
+                    updated[color] = [...(updated[color] || []), pos];
+                  }
+                });
+                return updated;
+              });
             }
           }
         }
       }
-      console.log("Yellow Colors after handling:", yellowColors);
     }
 
-    // Step 3: Fill remaining positions with random available colors or repeat, prioritizing best guess
+    // Step 3: Fill remaining positions, respecting exclusions and prioritizing remaining colors
     const bestGuess = findBestGuess(history);
     for (let i = 0; i < 4; i++) {
       if (!newGuess[i]) {
         if (availableColors.length === 0) {
           console.error("No available colors left after elimination!");
-          const fallbackColors = [...colors.filter(c => !currentEliminated.includes(c))]; // Use spread
+          const fallbackColors = ["🟣", "⚪"]; // Fallback to remaining colors (white, purple)
           if (fallbackColors.length === 0) {
             console.error("All colors eliminated—resetting to default.");
-            return ["🟣", "⚪", "🟣", "⚪"]; // Fallback to purple and white
+            return ["⚪", "⚪", "🟣", "🟣"]; // Fallback to the known solution (white, white, purple, purple)
           }
+          // Repeat fallback colors to fill 4 positions
           while (fallbackColors.length < 4) fallbackColors.push(...fallbackColors);
           fallbackColors.length = 4;
           const randomIndex = Math.floor(Math.random() * 4);
@@ -93,14 +124,23 @@ function SpotsSolver() {
         } else {
           let colorToUse = null;
           if (bestGuess) {
-            const bestColors = bestGuess.guess.filter(c => availableColors.includes(c));
+            const bestColors = bestGuess.guess.filter(c => 
+              availableColors.includes(c) && 
+              (!currentExclusions[c] || !currentExclusions[c].includes(i))
+            );
             if (bestColors.length > 0) {
               colorToUse = bestColors[Math.floor(Math.random() * bestColors.length)];
             }
           }
           if (!colorToUse) {
-            const randomIndex = Math.floor(Math.random() * availableColors.length);
-            colorToUse = availableColors[randomIndex];
+            const validColors = availableColors.filter(c => !currentExclusions[c]?.includes(i));
+            if (validColors.length > 0) {
+              const randomIndex = Math.floor(Math.random() * validColors.length);
+              colorToUse = validColors[randomIndex];
+            } else {
+              const randomIndex = Math.floor(Math.random() * availableColors.length);
+              colorToUse = availableColors[randomIndex];
+            }
           }
           newGuess[i] = colorToUse;
           availableColors = availableColors.filter(c => c !== colorToUse); // Filter instead of splice
@@ -113,14 +153,14 @@ function SpotsSolver() {
       }
     }
 
-    // Step 4: Ensure uniqueness from history and current guess, respecting color positions
+    // Step 4: Ensure uniqueness from history, respecting exclusions, and using only remaining colors
     let isDuplicate = arrayEquals(newGuess, currentGuess) || 
       history.some(entry => arrayEquals(entry.guess, currentGuess)); // Check against currentGuess
     
     let attempts = 0;
     while (isDuplicate && attempts < 20) {
       console.log("Guess is duplicate, reshuffling...");
-      availableColors = [...colors.filter(c => !currentEliminated.includes(c))]; // Reset with spread
+      availableColors = ["🟣", "⚪"]; // Reset to only remaining colors (white, purple) after elimination
       if (availableColors.length === 2) {
         const [color1, color2] = availableColors;
         const permutations = [
@@ -140,9 +180,15 @@ function SpotsSolver() {
       } else {
         for (let i = 0; i < 4 && availableColors.length > 0; i++) {
           if (!newGuess[i] || (currentPositions[newGuess[i]] && !currentPositions[newGuess[i]].includes(i))) {
-            const randomIndex = Math.floor(Math.random() * availableColors.length);
-            newGuess[i] = availableColors[randomIndex];
-            availableColors = availableColors.filter((_, idx) => idx !== randomIndex); // Filter instead of splice
+            const validColors = availableColors.filter(c => !currentExclusions[c]?.includes(i));
+            if (validColors.length > 0) {
+              const randomIndex = Math.floor(Math.random() * validColors.length);
+              newGuess[i] = validColors[randomIndex];
+            } else {
+              const randomIndex = Math.floor(Math.random() * availableColors.length);
+              newGuess[i] = availableColors[randomIndex];
+            }
+            availableColors = availableColors.filter(c => c !== newGuess[i]); // Filter instead of splice
             setColorPositions(prev => ({
               ...prev,
               [newGuess[i]]: [...(prev[newGuess[i]] || []), i]
@@ -157,7 +203,7 @@ function SpotsSolver() {
 
     if (isDuplicate) {
       console.warn("Couldn’t find unique guess after 20 attempts, forcing change.");
-      availableColors = [...colors.filter(c => !currentEliminated.includes(c))]; // Use spread
+      availableColors = ["🟣", "⚪"]; // Force use of only white and purple
       const permutations = generatePermutations(availableColors, 4);
       for (const perm of permutations) {
         if (!arrayEquals(perm, currentGuess) && !history.some(entry => arrayEquals(entry.guess, perm))) {
@@ -167,12 +213,40 @@ function SpotsSolver() {
       }
     }
 
-    // Update color positions for the final guess
+    // Update color positions and exclusions for the final guess
     newGuess.forEach((color, i) => {
       setColorPositions(prev => ({
         ...prev,
         [color]: [...(prev[color] || []), i]
       }));
+      // Update exclusions based on no green feedback in history for this color/position
+      if (!history.some(entry => entry.feedback.green > 0 && entry.guess[i] === color)) {
+        setPositionExclusions(prev => ({
+          ...prev,
+          [color]: [...(prev[color] || []), i]
+        }));
+      }
+    });
+
+    // Eliminate colors not in solution after any 4 yellow feedback
+    if (history.some(entry => entry.feedback.yellow === 4)) {
+      const solutionColors = ["🟣", "⚪"]; // After eliminating red, blue, green, yellow, only white and purple remain
+      setEliminatedColors(prev => [...new Set([...prev, ...colors.filter(c => !solutionColors.includes(c))])]);
+    }
+
+    // Eliminate colors that have appeared in all positions with 0 green feedback
+    const colorFrequency = {};
+    history.forEach(entry => {
+      if (entry.feedback.green === 0) {
+        entry.guess.forEach(color => {
+          colorFrequency[color] = (colorFrequency[color] || 0) + 1;
+        });
+      }
+    });
+    Object.entries(colorFrequency).forEach(([color, count]) => {
+      if (count >= 4 && !newGuess.includes(color)) { // If a color has been in all 4 positions with 0 green
+        setEliminatedColors(prev => [...new Set([...prev, color])]);
+      }
     });
 
     console.log("New Guess:", newGuess);
@@ -214,8 +288,10 @@ function SpotsSolver() {
       return;
     }
 
-    // Step 1: Update eliminated colors based on feedback
+    // Step 1: Update eliminated colors and position exclusions based on feedback
     let newEliminated = [...eliminatedColors];
+    let newExclusions = { ...positionExclusions };
+
     if (green === 0 && yellow === 0) {
       newEliminated = [...new Set([...newEliminated, ...guess])];
     } else if (yellow === 0 && green < 4) {
@@ -223,13 +299,55 @@ function SpotsSolver() {
       if (bestGuess) {
         newEliminated = [...new Set([...newEliminated, ...guess.filter(c => !bestGuess.guess.includes(c))])];
       }
+      // Eliminate colors that have appeared in all positions with 0 green feedback
+      const colorFrequency = {};
+      history.forEach(entry => {
+        if (entry.feedback.green === 0) {
+          entry.guess.forEach(color => {
+            colorFrequency[color] = (colorFrequency[color] || 0) + 1;
+          });
+        }
+      });
+      Object.entries(colorFrequency).forEach(([color, count]) => {
+        if (count >= 4 && !newEliminated.includes(color)) {
+          newEliminated = [...new Set([...newEliminated, color])];
+        }
+      });
+    } else if (yellow === 4) {
+      // For 4 yellow, eliminate all colors not in the guess
+      newEliminated = [...new Set([...newEliminated, ...colors.filter(c => !guess.includes(c))])];
+      // Ensure only white and purple are considered after eliminating red, blue, green, yellow
+      const solutionColors = ["🟣", "⚪"];
+      newEliminated = [...new Set([...newEliminated, ...colors.filter(c => !solutionColors.includes(c))])];
+    } else {
+      // Update exclusions based on no green feedback in history
+      guess.forEach((color, pos) => {
+        if (!history.some(entry => entry.feedback.green > 0 && entry.guess[pos] === color)) {
+          newExclusions[color] = [...(newExclusions[color] || []), pos];
+        }
+      });
+      // For 1–3 yellow, track potential positions but don’t lock unless strong green evidence
+      if (green < 3) {
+        guess.forEach((color, pos) => {
+          if (!history.some(entry => entry.feedback.green > 0 && entry.guess[pos] === color)) {
+            newExclusions[color] = [...(newExclusions[color] || []), pos];
+          }
+        });
+      }
     }
 
-    // Step 2: Update color positions based on feedback
+    // Step 2: Update color positions based on feedback (only lock if 3+ green)
     let newPositions = { ...colorPositions };
     const availableColors = colors.filter(c => !newEliminated.includes(c));
-    for (let i = 0; i < green; i++) {
-      newPositions[guess[i]] = [...(newPositions[guess[i]] || []), i];
+    if (green >= 3) {
+      for (let i = 0; i < green; i++) {
+        newPositions[guess[i]] = [...(newPositions[guess[i]] || []), i];
+      }
+    } else {
+      // For 1–2 green, track but don’t lock—use for prioritization
+      for (let i = 0; i < green; i++) {
+        newPositions[guess[i]] = [...(newPositions[guess[i]] || []), i];
+      }
     }
     for (let i = 0; i < yellow; i++) {
       const color = guess.find(c => availableColors.includes(c) && !newPositions[c]?.includes(i));
@@ -240,11 +358,12 @@ function SpotsSolver() {
     const newHistory = [{ guess: [...guess], feedback: { green, yellow } }, ...history];
 
     // Step 4: Generate next guess with updated data
-    const nextGuess = generateNextGuess(guess, { green, yellow }, newEliminated, newPositions);
+    const nextGuess = generateNextGuess(guess, { green, yellow }, newEliminated, newPositions, newExclusions);
 
     // Step 5: Update state
     setEliminatedColors(newEliminated);
     setColorPositions(newPositions);
+    setPositionExclusions(newExclusions);
     setHistory(newHistory);
     setGuess([...nextGuess]); // Use spread for a new array
 
