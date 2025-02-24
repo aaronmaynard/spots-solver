@@ -1,70 +1,101 @@
-# Getting Started with Create React App
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+# Spots Solver
 
-## Available Scripts
+## Overview
 
-In the project directory, you can run:
+Spots Solver is a React-based web application designed to solve the Spots.wtf puzzle game, a color-based guessing game similar to Mastermind. The solver uses a constraint-based algorithm to generate optimal guesses, process feedback (green dots for correct positions, yellow dots for correct colors in wrong positions), and eliminate invalid colors until it identifies the hidden sequence of 4 colored dots. The project is built with React for the user interface and includes a modular JavaScript solver logic for efficient game-solving.
 
-### `npm start`
+This repository contains the source code for the Spots Solver, allowing users to interact with the solver, input feedback, and track guess history in real-time.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Features
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- **Interactive UI**: A clean, dark-themed interface for entering feedback and viewing guesses.
+- **Constraint-Based Solving**: Uses a deterministic algorithm to minimize guesses and maximize information gain.
+- **Feedback Processing**: Handles green and yellow dot feedback to refine guesses dynamically.
+- **History Tracking**: Displays the current guess, best guess so far, guess history, and eliminated colors.
+- **Error Handling**: Validates user input and provides alerts for errors or invalid feedback.
+- **Rate Limiting**: Prevents duplicate submissions with a 2-second throttle to ensure reliable operation.
 
-### `npm test`
+## Prerequisites
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Before you begin, ensure you have the following installed:
 
-### `npm run build`
+- **Node.js** (v14 or higher)
+- **npm** (Node Package Manager, typically included with Node.js)
+- **Git** (optional, for cloning the repository)
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Installation
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+Follow these steps to set up and run the Spots Solver locally:
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/your-username/spots-solver.git
+   cd spots-solver
+   ```
 
-### `npm run eject`
+2. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+3. **Run the Application**:
+   ```bash
+   npm start
+   ```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+   This will launch the application in development mode. Open your browser to `http://localhost:3000` to use the solver.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## Usage
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+1. **Start the Solver**:
+   - Upon loading, the solver displays an initial guess (e.g., 🔴 🔵 ⚪ 🟣).
+   
+2. **Enter Feedback**:
+   - Use the input fields to enter the number of green dots (correct color in correct position) and yellow dots (correct color in wrong position) for the current guess.
+   - Click "Submit Feedback" to process the feedback and generate the next guess.
 
-## Learn More
+3. **Track Progress**:
+   - View the "Current Guess," "Best Guess So Far," "Guess History," and "Eliminated Colors" sections to monitor the solver’s progress.
+   - The solver eliminates colors and refines guesses based on your feedback until it solves the puzzle (4 green dots, 0 yellow dots).
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+4. **Example**:
+   - If the hidden sequence is ⚪ ⚪ 🟢 🟢:
+     - Initial guess: 🔴 🔵 ⚪ 🟣 → Submit `0 🟢, 0 🟡` to eliminate red, blue, purple, and possibly white.
+     - Next guess: 🟢 🟡 ⚪ 🟣 → Submit `0 🟢, 2 🟡` (green and yellow present but misplaced).
+     - Next guess: ⚪ ⚪ 🟢 🟢 → Submit `4 🟢, 0 🟡` to solve the puzzle.
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## Contributing
 
-### Code Splitting
+We welcome contributions to improve Spots Solver! Here’s how you can contribute:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+1. **Fork the Repository**:
+   - Create your own fork of this repository on GitHub.
 
-### Analyzing the Bundle Size
+2. **Create a Branch**:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+3. **Make Changes**:
+   - Implement your changes, ensuring they align with the project’s coding style and functionality.
 
-### Making a Progressive Web App
+4. **Test Locally**:
+   - Follow the installation steps above and test your changes using `npm start`.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+5. **Submit a Pull Request**:
+   - Push your changes to your fork and submit a pull request to the main repository.
+   - Provide a clear description of your changes and any related issues.
 
-### Advanced Configuration
+6. **Code Standards**:
+   - Use consistent indentation (2 spaces), follow JavaScript and React best practices, and include comments for complex logic.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+## License
 
-### Deployment
+This project is licensed under the [GNU General Public License v3.0 (GPL-3.0)](LICENSE). See the [LICENSE](LICENSE) file for details.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+## Acknowledgments
 
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- Inspired by the Spots.wtf game, a color-based puzzle challenge.
+- Built using React, a JavaScript library for building user interfaces.
+- Thanks to the open-source community for tools like Node.js, npm, and Git.
