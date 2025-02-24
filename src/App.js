@@ -278,10 +278,16 @@ function SpotsSolver() {
     return perms;
   };
 
-  // Handle feedback submission
+  // Handle feedback submission with validation
   const handleSubmit = () => {
-    const green = Math.max(0, Math.min(parseInt(greenInput) || 0, 4));
-    const yellow = Math.max(0, Math.min(parseInt(yellowInput) || 0, 4 - green));
+    // Validation for inputs
+    if (!greenInput || !yellowInput || isNaN(parseInt(greenInput)) || isNaN(parseInt(yellowInput))) {
+      alert("Please enter valid numbers (0–4) for both Green Dots and Yellow Dots before submitting feedback.");
+      return;
+    }
+
+    const green = Math.max(0, Math.min(parseInt(greenInput), 4));
+    const yellow = Math.max(0, Math.min(parseInt(yellowInput), 4));
 
     if (green === 4) {
       alert("You’ve solved it! The code is: " + guess.join(" "));
